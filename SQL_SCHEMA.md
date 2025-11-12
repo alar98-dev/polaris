@@ -28,7 +28,7 @@ Em geral, vetores (embeddings) serão armazenados em `artifact_chunks.embedding`
 CREATE EXTENSION IF NOT EXISTS vector;
 ```
 
-3. Habilitar configurações necessárias no Postgres (memória, work_mem tuning) se indexação ivfflat for usada.
+3. Habilitar configurações necessárias no Postgres (memória, work_mem tuning).
 
 ---
 
@@ -111,15 +111,15 @@ CREATE INDEX idx_artifacts_created_at ON artifacts (created_at);
 CREATE INDEX idx_artifact_chunks_metadata ON artifact_chunks USING GIN (metadata);
 ```
 
-2. Índice vetorial para busca semântica com pgvector (ivfflat speeds up nearest neighbor):
+2. Índice vetorial para busca semântica com pgvector (hnsw speeds up nearest neighbor):
 
 ```sql
 -- ajustar 'lists' conforme Tamanho do dataset e memória
-CREATE INDEX idx_artifact_chunks_embedding_ivfflat ON artifact_chunks USING ivfflat (embedding) WITH (lists = 100);
+CREATE INDEX idx_artifact_chunks_embedding_hnsw ON artifact_chunks USING hnsw (embedding);
 ```
 
 Notas:
-- Antes de criar ivfflat index, execute `SELECT vector_cosine_distance(...)` load check; o ivfflat index precisa de build time e tuning das lists.
+
 - Se dataset pequeno, busca linear (`ORDER BY embedding <-> query`) pode ser suficiente sem índice.
 
 ---
@@ -277,7 +277,7 @@ class ArtifactChunk(Base):
 
 - Verificar instalação `pgvector` no Postgres
 - Definir dimensão de vector (conforme modelo de embedding)
-- Tunning `ivfflat lists` com base no dataset
+
 - Criar backups e plano de rollback para migrações
 - Definir políticas de retenção e masking para PII
 

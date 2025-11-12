@@ -343,11 +343,11 @@ Alembic
   CREATE EXTENSION IF NOT EXISTS vector;
   ```
 
-- Criar índices para aceleração (ex.: `ivfflat` ou `l2` index conforme `pgvector`):
+- Criar índices para aceleração (ex.: `hnsw` ou `l2` index conforme `pgvector`):
 
   ```sql
   -- exemplo
-  CREATE INDEX ON artifact_chunks USING ivfflat (embedding vector_l2_ops) WITH (lists = 100);
+  CREATE INDEX ON artifact_chunks USING hnsw (embedding vector_l2_ops);
   ```
 
 Ingestão (pipeline)

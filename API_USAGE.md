@@ -275,6 +275,142 @@ Endpoint para conversa livre com o agente.
 }
 ```
 
+### 9. Chat com WebSocket (Streaming)
+
+Endpoint WebSocket para chat em tempo real com streaming de respostas. Ideal para integração em frontends web.
+
+**Endpoint:** `WebSocket /ws/chat`
+
+**Protocolo:**
+- Cliente envia mensagens JSON
+- Servidor responde com tokens em tempo real
+- Suporte a sessões persistentes
+- Streaming de resposta token por token
+- Streaming de resposta token por token
+
+**Mensagens do Cliente:**
+```json
+{
+  "message": "Explique como funciona machine learning",
+  "session_id": "sess_abc123"  // opcional, será criado se não existir
+}
+```
+
+**Mensagens do Servidor:**
+```json
+// Sessão criada (se não fornecida)
+{
+  "type": "session_created",
+  "session_id": "sess_abc123"
+}
+
+// Tokens de resposta (streaming)
+{
+  "type": "token",
+  "text": "Machine",
+  "session_id": "sess_abc123"
+}
+{
+  "type": "token",
+  "text": " learning",
+  "session_id": "sess_abc123"
+}
+
+// Resposta completa
+{
+  "type": "done",
+  "full_response": "Machine learning é...",
+  "session_id": "sess_abc123"
+}
+
+// Erros
+{
+  "type": "error",
+  "error": "LLM service unavailable"
+}
+```
+
+**Integração no Frontend:**
+
+```javascript
+class PolarisChat {
+    constructor(onMessageCallback) {
+        this.ws = null;
+        this.sessionId = null;
+        this.onMessage = onMessageCallback;
+        this.connect();
+    }
+
+    connect() {
+        this.ws = new WebSocket('ws://localhost:8000/ws/chat');
+
+        this.ws.onopen = () => {
+            console.log('Connected to POLARIS chat');
+        };
+
+        this.ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            this.onMessage(data);
+        };
+
+        this.ws.onclose = () => {
+            console.log('Disconnected from POLARIS chat');
+        };
+
+        this.ws.onerror = (error) => {
+            console.error('WebSocket error:', error);
+        };
+    }
+
+    sendMessage(message, sessionId = null) {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({
+                message: message,
+                session_id: sessionId || this.sessionId
+            }));
+        }
+    }
+
+    disconnect() {
+        if (this.ws) {
+            this.ws.close();
+        }
+    }
+}
+
+// Exemplo de uso no seu frontend
+const chat = new PolarisChat((data) => {
+    switch (data.type) {
+        case 'session_created':
+            // Salvar sessionId
+            chat.sessionId = data.session_id;
+            break;
+        case 'token':
+            // Adicionar token à resposta em tempo real
+            updateChatUI(data.text);
+            break;
+        case 'done':
+            // Resposta completa recebida
+            finalizeResponse(data.full_response);
+            break;
+        case 'error':
+            // Tratar erro
+            showError(data.error);
+            break;
+    }
+});
+
+// Enviar mensagem
+chat.sendMessage("Olá, como você pode me ajudar?");
+```
+
+**Considerações para Produção:**
+- Implemente reconexão automática em caso de desconexão
+- Gerencie estado de loading durante streaming
+- Adicione timeout para conexões inativas
+- Considere usar wss:// (WebSocket seguro) em produção
+- Implemente rate limiting no frontend para evitar spam
+
 ## Fluxo Típico de Uso
 
 1. **Criar Sessão**

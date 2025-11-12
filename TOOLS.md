@@ -58,7 +58,7 @@ Este documento lista ferramentas, bibliotecas Python e tecnologias recomendadas 
 ## Banco de dados / Indexação vetorial
 
 - PostgreSQL 13+ com extensão `pgvector` (recomendado) — armazena vetores e dados relacionais
-- Índices: ivfflat/L2 com pgvector para alta performance
+- Índices: hnsw/L2 com pgvector para alta performance
 - Alternativa: vector DB (Pinecone, Milvus, Weaviate) se escala de RAG aumentar
 
 ## Dependências de sistema / ferramentas CLI
