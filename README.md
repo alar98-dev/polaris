@@ -1,3 +1,22 @@
+# POLARIS — Agente de Desenvolvimento de Software
+
+## 🚀 Início Rápido
+
+O POLARIS é um agente de IA que auxilia no desenvolvimento de software, desde descoberta de requisitos até geração de protótipos e estimativas.
+
+### Como Usar a API
+
+Para instruções completas de uso da API FastAPI, consulte: **[API_USAGE.md](API_USAGE.md)**
+
+**Iniciar servidor:**
+```bash
+uvicorn polaris.app:app --host 0.0.0.0 --port 8000
+```
+
+**Documentação interativa:** http://localhost:8000/docs
+
+---
+
 # POLARIS — Guia de Interação com Modelos do Servidor
 
 Este documento descreve como o agente POLARIS deve interagir com os modelos hospedados no servidor (LLMs, embeddings, modelos de visão, etc.). Contém convenções, endpoints recomendados, exemplos e boas práticas.
