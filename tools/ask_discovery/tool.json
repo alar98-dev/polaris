@@ -1,0 +1,21 @@
+{
+  "type": "function",
+  "function": {
+    "name": "ask_discovery",
+    "description": "Processa uma mensagem do cliente durante a fase de discovery (levantamento de requisitos). Esta ferramenta extrai automaticamente informações-chave (dor/problema, usuários-alvo, KPI de sucesso, orçamento) e retorna a próxima pergunta a ser feita ou indica que o discovery está completo. É a ferramenta principal do fluxo conversacional de vendas consultivas.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "session_id": {
+          "type": "string",
+          "description": "UUID da sessão ativa (obtido via create_session)"
+        },
+        "message": {
+          "type": "string",
+          "description": "Mensagem/resposta do cliente contendo informações sobre suas necessidades, problema, orçamento, etc."
+        }
+      },
+      "required": ["session_id", "message"]
+    }
+  }
+}

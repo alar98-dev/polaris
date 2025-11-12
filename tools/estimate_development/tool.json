@@ -1,0 +1,30 @@
+{
+  "type": "function",
+  "function": {
+    "name": "estimate_development",
+    "description": "Estima o esforço de desenvolvimento necessário para implementar as funcionalidades listadas. Retorna estimativa em horas totais, breakdown por feature classificada por complexidade (simple/medium/complex), e tamanho t-shirt (S/M/L/XL). Útil para planejamento e precificação inicial.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "session_id": {
+          "type": "string",
+          "description": "UUID da sessão ativa"
+        },
+        "features": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Lista de funcionalidades a serem estimadas (ex: ['Login de usuário', 'Cadastro de produtos', 'Checkout com cartão'])",
+          "minItems": 1
+        },
+        "include_buffer": {
+          "type": "boolean",
+          "description": "Se true, adiciona 20% de buffer para imprevistos (default: false)",
+          "default": false
+        }
+      },
+      "required": ["session_id", "features"]
+    }
+  }
+}

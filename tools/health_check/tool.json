@@ -1,0 +1,23 @@
+{
+  "type": "function",
+  "function": {
+    "name": "health_check",
+    "description": "Verifica o status de saúde do agente POLARIS e suas dependências (LLM, embeddings, banco de dados). Use esta ferramenta para diagnosticar problemas ou verificar disponibilidade dos serviços antes de operações críticas.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "check_embeddings": {
+          "type": "boolean",
+          "description": "Se true, verifica também o serviço de embeddings. Default: false",
+          "default": false
+        },
+        "check_database": {
+          "type": "boolean",
+          "description": "Se true, verifica também a conexão com o banco de dados. Default: false",
+          "default": false
+        }
+      },
+      "required": []
+    }
+  }
+}

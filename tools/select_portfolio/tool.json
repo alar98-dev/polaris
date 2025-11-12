@@ -1,0 +1,43 @@
+{
+  "type": "function",
+  "function": {
+    "name": "select_portfolio",
+    "description": "Busca e recomenda projetos do portfólio da agência ORION que melhor atendem às necessidades do cliente. Usa busca semântica (RAG) baseada nas informações coletadas no discovery para selecionar até N projetos mais relevantes, cada um com score de similaridade e justificativa.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Descrição da necessidade do cliente ou resumo do discovery (ex: 'e-commerce B2C mobile com foco em conversão, orçamento 50k')"
+        },
+        "top_k": {
+          "type": "integer",
+          "description": "Número de projetos a retornar (default: 5, máximo: 10)",
+          "default": 5,
+          "minimum": 1,
+          "maximum": 10
+        },
+        "filters": {
+          "type": "object",
+          "description": "Filtros adicionais para refinar a busca",
+          "properties": {
+            "max_budget": {
+              "type": "number",
+              "description": "Orçamento máximo do cliente"
+            },
+            "required_stack": {
+              "type": "array",
+              "items": {"type": "string"},
+              "description": "Tecnologias obrigatórias (ex: ['react', 'nodejs'])"
+            },
+            "industry": {
+              "type": "string",
+              "description": "Setor/indústria do cliente (ex: 'ecommerce', 'saas', 'fintech')"
+            }
+          }
+        }
+      },
+      "required": ["query"]
+    }
+  }
+}

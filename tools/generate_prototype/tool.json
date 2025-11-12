@@ -1,0 +1,46 @@
+{
+  "type": "function",
+  "function": {
+    "name": "generate_prototype",
+    "description": "Gera documentação técnica completa de protótipo em Markdown para o projeto escolhido pelo cliente. O documento inclui: sumário executivo, requisitos funcionais e não-funcionais, modelo de dados, endpoints principais, arquitetura, riscos e próximos passos. Use após o cliente escolher uma opção do portfólio.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "session_id": {
+          "type": "string",
+          "description": "UUID da sessão ativa"
+        },
+        "choice_id": {
+          "type": "integer",
+          "description": "ID do projeto/solução escolhido pelo cliente (obtido de select_portfolio)"
+        },
+        "context": {
+          "type": "object",
+          "description": "Contexto adicional para personalizar o protótipo",
+          "properties": {
+            "summary": {
+              "type": "string",
+              "description": "Resumo executivo do projeto"
+            },
+            "features": {
+              "type": "array",
+              "items": {"type": "string"},
+              "description": "Lista de funcionalidades principais (mínimo 5)"
+            },
+            "constraints": {
+              "type": "array",
+              "items": {"type": "string"},
+              "description": "Restrições técnicas ou de negócio"
+            },
+            "integrations": {
+              "type": "array",
+              "items": {"type": "string"},
+              "description": "Integrações necessárias com sistemas externos"
+            }
+          }
+        }
+      },
+      "required": ["session_id", "choice_id"]
+    }
+  }
+}

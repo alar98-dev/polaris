@@ -1,0 +1,35 @@
+{
+  "type": "function",
+  "function": {
+    "name": "create_session",
+    "description": "Cria uma nova sessão de conversa com o cliente. Use esta ferramenta no início de cada interação para inicializar o contexto do cliente e obter um session_id que será usado em todas as chamadas subsequentes.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "client_id": {
+          "type": "string",
+          "description": "Identificador único do cliente (email, UUID, ou outro identificador). Opcional se o cliente for anônimo."
+        },
+        "metadata": {
+          "type": "object",
+          "description": "Metadados adicionais sobre o cliente ou contexto da sessão (ex: origem, campanha, idioma preferido).",
+          "properties": {
+            "source": {
+              "type": "string",
+              "description": "Origem da sessão (ex: 'website', 'whatsapp', 'email')"
+            },
+            "campaign": {
+              "type": "string",
+              "description": "Campanha de marketing associada"
+            },
+            "language": {
+              "type": "string",
+              "description": "Idioma preferido (ISO 639-1, ex: 'pt', 'en')"
+            }
+          }
+        }
+      },
+      "required": []
+    }
+  }
+}

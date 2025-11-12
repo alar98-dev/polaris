@@ -28,7 +28,8 @@ async def test_patch_slots_updates_session():
 
 @pytest.mark.asyncio
 async def test_discovery_flow_with_extractor(monkeypatch):
-    from polaris import app as pol_app
+    import importlib
+    pol_app = importlib.import_module('polaris.app')
     app = pol_app.app
 
     # fake call_llm to return an extraction JSON

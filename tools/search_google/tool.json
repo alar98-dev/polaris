@@ -1,0 +1,40 @@
+{
+  "type": "function",
+  "function": {
+    "name": "search_google",
+    "description": "Realiza uma pesquisa no Google e retorna os resultados mais relevantes. Útil para encontrar informações atualizadas, benchmarking de concorrentes, tendências de mercado, tecnologias, ou qualquer informação pública disponível na web. Retorna título, snippet e URL dos resultados. Use quando o cliente perguntar sobre informações que requerem pesquisa na internet.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Termo de busca ou pergunta a ser pesquisada no Google. Pode incluir operadores de busca (ex: 'site:exemplo.com', 'filetype:pdf')"
+        },
+        "num_results": {
+          "type": "integer",
+          "description": "Número de resultados a retornar (default: 5, máximo: 10)",
+          "default": 5,
+          "minimum": 1,
+          "maximum": 10
+        },
+        "language": {
+          "type": "string",
+          "description": "Código do idioma para resultados (default: 'pt' para português, também aceita 'en', 'es', etc.)",
+          "default": "pt"
+        },
+        "safe_search": {
+          "type": "boolean",
+          "description": "Se true, filtra conteúdo adulto/explícito (default: true)",
+          "default": true
+        },
+        "time_range": {
+          "type": "string",
+          "description": "Filtro temporal dos resultados: 'day' (último dia), 'week' (última semana), 'month' (último mês), 'year' (último ano), ou null para todos os tempos",
+          "enum": ["day", "week", "month", "year", null],
+          "default": null
+        }
+      },
+      "required": ["query"]
+    }
+  }
+}

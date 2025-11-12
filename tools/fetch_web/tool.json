@@ -1,0 +1,36 @@
+{
+  "type": "function",
+  "function": {
+    "name": "fetch_web",
+    "description": "Busca e extrai o conteúdo textual de uma página web. Útil para ler documentação, artigos, páginas de produtos ou qualquer conteúdo público na internet. Retorna o texto principal da página, removendo elementos de navegação, scripts e estilos. Use quando o cliente mencionar URLs ou quando precisar de informações específicas de um site.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "URL completa da página a ser buscada (deve iniciar com http:// ou https://). Ex: 'https://exemplo.com/artigo'"
+        },
+        "timeout": {
+          "type": "integer",
+          "description": "Timeout em segundos para a requisição (default: 15, máximo: 30)",
+          "default": 15,
+          "minimum": 5,
+          "maximum": 30
+        },
+        "extract_links": {
+          "type": "boolean",
+          "description": "Se true, extrai também os links principais da página (default: false)",
+          "default": false
+        },
+        "max_length": {
+          "type": "integer",
+          "description": "Número máximo de caracteres do conteúdo a retornar (default: 5000, máximo: 50000)",
+          "default": 5000,
+          "minimum": 1000,
+          "maximum": 50000
+        }
+      },
+      "required": ["url"]
+    }
+  }
+}

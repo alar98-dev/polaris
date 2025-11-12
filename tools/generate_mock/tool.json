@@ -1,0 +1,51 @@
+{
+  "type": "function",
+  "function": {
+    "name": "generate_mock",
+    "description": "Gera dados de exemplo (mocks) em formato JSON para o projeto. Os mocks são validados contra contratos Pydantic quando disponíveis e incluem tanto exemplos válidos quanto inválidos para facilitar testes. Útil para desenvolvedores iniciarem a implementação rapidamente.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "session_id": {
+          "type": "string",
+          "description": "UUID da sessão ativa"
+        },
+        "contract_name": {
+          "type": "string",
+          "description": "Nome do contrato/schema para gerar mocks (ex: 'User', 'Product', 'Order')"
+        },
+        "context": {
+          "type": "object",
+          "description": "Contexto adicional para personalizar os mocks",
+          "properties": {
+            "example_base": {
+              "type": "object",
+              "description": "Objeto base de exemplo para variações"
+            },
+            "domain": {
+              "type": "string",
+              "description": "Domínio do negócio (ex: 'ecommerce', 'fintech', 'healthcare')"
+            },
+            "locale": {
+              "type": "string",
+              "description": "Localidade para dados (ex: 'pt_BR', 'en_US')"
+            }
+          }
+        },
+        "count": {
+          "type": "integer",
+          "description": "Número de exemplos válidos a gerar (default: 10, máximo: 100)",
+          "default": 10,
+          "minimum": 1,
+          "maximum": 100
+        },
+        "include_invalid": {
+          "type": "boolean",
+          "description": "Se true, inclui 2 exemplos inválidos para testes de validação (default: true)",
+          "default": true
+        }
+      },
+      "required": ["session_id", "contract_name"]
+    }
+  }
+}
