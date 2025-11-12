@@ -165,6 +165,4 @@ alembic upgrade head
 uvicorn polaris.app:app --host 0.0.0.0 --port 8002
 ```
 
-Contato/Owner
-- Owner operacional: `ml-team@example.com` (substitua pelo contato real no `METADATA.md`).
 
