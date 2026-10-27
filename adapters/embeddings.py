@@ -2,11 +2,8 @@ import os
 import requests
 from typing import List, Dict, Any, Optional
 
-EMBEDDING_URL = os.getenv('EMBEDDING_URL', 'http://localhost:8001')
-# Allow overriding paths if the embedding service uses non-standard routes
+EMBEDDING_URL = os.getenv('EMBEDDING_URL', 'http://127.0.0.1:20002')
 EMBEDDING_EMBED_PATH = os.getenv('EMBEDDING_EMBED_PATH', '/v1/embeddings')
-EMBEDDING_UPSERT_PATH = os.getenv('EMBEDDING_UPSERT_PATH', '/v1/upsert')
-EMBEDDING_SEARCH_PATH = os.getenv('EMBEDDING_SEARCH_PATH', '/v1/search')
 
 
 def _url(path: str) -> str:
@@ -14,16 +11,12 @@ def _url(path: str) -> str:
 
 
 def get_embedding(texts: List[str], model: Optional[str] = None) -> List[List[float]]:
-    """Pede embeddings para o serviço de embeddings.
-
-    Assunção de contrato (ajustar conforme implementação do serviço):
-    POST {EMBEDDING_URL}/v1/embeddings
-    body: { "inputs": [..], "model": "..." }
-    response: { "embeddings": [[...], ...] }
+    """Pede embeddings para o Subcórtex Gemma 270M (640D) no host 127.0.0.1:20002.
+    
+    Suporta payload 'input' (formato OpenAI/llama.cpp) e 'inputs' (compatibilidade).
     """
-    # try a few common paths if the configured one fails
     candidates = [EMBEDDING_EMBED_PATH, '/v1/embeddings', '/embeddings', '/v1/embed', '/embed']
-    payload = {'inputs': texts}
+    payload = {'input': texts, 'inputs': texts}
     if model:
         payload['model'] = model
     body = None
@@ -39,63 +32,44 @@ def get_embedding(texts: List[str], model: Optional[str] = None) -> List[List[fl
             last_err = e
             continue
     if body is None:
-        raise last_err
-    # suportar formatos variados
-    if 'embeddings' in body:
-        return body['embeddings']
-    if 'data' in body:
-        # por exemplo: OpenAI-like { data: [ { embedding: [...] }, ... ] }
+        raise last_err or RuntimeError("Failed to obtain embeddings from upstream")
+
+    if 'data' in body and isinstance(body['data'], list):
         out = []
         for item in body['data']:
             if isinstance(item, dict) and 'embedding' in item:
                 out.append(item['embedding'])
         return out
-    # fallback
+
+    if 'embeddings' in body:
+        return body['embeddings']
+
     return []
 
 
 def upsert_vector(id: Any, vector: List[float], metadata: Optional[Dict[str, Any]] = None) -> bool:
-    """Insere/atualiza vetor no serviço.
+    """Insere/atualiza vetor no banco PostgreSQL 17 nativo via polaris.db."""
+    try:
+        from polaris.db import get_db
+        from polaris.sql_models import ArtifactChunk
+        from sqlalchemy import select
 
-    Assunção: POST {EMBEDDING_URL}/v1/upsert { items: [{id, vector, metadata}] }
-    """
-    candidates = [EMBEDDING_UPSERT_PATH, '/v1/upsert', '/upsert', '/v1/collections/upsert']
-    payload = {'items': [{'id': id, 'vector': vector, 'metadata': metadata or {}}]}
-    last_err = None
-    for p in candidates:
-        try:
-            url = _url(p)
-            r = requests.post(url, json=payload, timeout=10)
-            r.raise_for_status()
-            return r.status_code == 200
-        except Exception as e:
-            last_err = e
-            continue
-    raise last_err
+        with get_db() as db:
+            chunk = db.execute(select(ArtifactChunk).where(ArtifactChunk.id == int(id))).scalar_one_or_none()
+            if chunk:
+                chunk.embedding = vector
+                if metadata:
+                    chunk.metadata_ = {**(chunk.metadata_ or {}), **metadata}
+                return True
+        return False
+    except Exception:
+        return False
 
 
-def search_vector(vector: List[float], top_k: int = 10) -> List[Dict[str, Any]]:
-    """Busca vetores similares.
-
-    Assunção: POST {EMBEDDING_URL}/v1/search { vector, top_k }
-    resposta esperada: { results: [ { id, score, metadata }, ... ] }
-    """
-    candidates = [EMBEDDING_SEARCH_PATH, '/v1/search', '/search', '/v1/query', '/query']
-    payload = {'vector': vector, 'top_k': top_k}
-    body = None
-    last_err = None
-    for p in candidates:
-        try:
-            url = _url(p)
-            r = requests.post(url, json=payload, timeout=10)
-            r.raise_for_status()
-            body = r.json()
-            break
-        except Exception as e:
-            last_err = e
-            continue
-    if body is None:
-        raise last_err
-    if 'results' in body:
-        return body['results']
-    return body.get('matches') or body.get('items') or []
+def search_vectors(vector: List[float], top_k: int = 5) -> List[Dict[str, Any]]:
+    """Busca os k vetores mais próximos no banco PostgreSQL 17 via HNSW."""
+    try:
+        from polaris.db import search_similar_chunks
+        return search_similar_chunks(vector, top_k=top_k)
+    except Exception:
+        return []

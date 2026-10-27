@@ -1,13 +1,15 @@
-"""Core Polaris agent implementation (clean single-file version).
+"""Core Polaris agent implementation with Native Aeon / SWA Integration.
 
-This file intentionally keeps a compact, single definition of PolarisAgent used by tests
-and the FastAPI app. It provides lightweight, test-friendly behavior and defers heavy
-integrations (DB, external embedding stores) to adapters.
+Integrates:
+- Córtex Superior (Gemma-3 1B) on http://127.0.0.1:20003 (/v1/chat/completions)
+- Subcórtex (Gemma-3 270M) on http://127.0.0.1:20002 (/v1/embeddings - 640D)
+- PostgreSQL 17 swa_matrix schema polaris (pgvector HNSW)
 """
 
 import os
 import uuid
 import time
+import json
 from typing import List, Dict, Optional, Any
 
 import httpx
@@ -19,16 +21,20 @@ try:
 except Exception:
     embedding_adapter = None
 
+try:
+    from .db import save_conversation_turn, save_artifact_with_chunks, search_similar_chunks
+except Exception:
+    save_conversation_turn = None
+    save_artifact_with_chunks = None
+    search_similar_chunks = None
+
 
 class PolarisAgent:
-    """Minimal, clean PolarisAgent implementation used by tests and API.
-
-    Methods implemented are the ones required by the test-suite and the FastAPI app.
-    """
+    """PolarisAgent with native bi-cameral inference and pgvector persistence."""
 
     def __init__(self, llm_url: Optional[str] = None, embedding_url: Optional[str] = None):
-        self.llm_url = llm_url or os.getenv('LLM_URL', 'http://localhost:8100')
-        self.embedding_url = embedding_url or os.getenv('EMBEDDING_URL', 'http://localhost:8001')
+        self.llm_url = llm_url or os.getenv('LLM_URL', 'http://127.0.0.1:20003')
+        self.embedding_url = embedding_url or os.getenv('EMBEDDING_URL', 'http://127.0.0.1:20002')
         self.sessions: Dict[str, Dict] = {}
 
     def create_session(self, client_id: Optional[str] = None, metadata: Optional[dict] = None) -> str:
@@ -40,19 +46,33 @@ class PolarisAgent:
             'turns': [],
             'created_at': time.time(),
         }
+        if save_conversation_turn:
+            try:
+                save_conversation_turn(session_id, client_id, [], metadata or {})
+            except Exception:
+                pass
         return session_id
 
     async def health_check(self) -> Dict[str, Any]:
         results: Dict[str, Any] = {'ok': True, 'components': {}}
         async with httpx.AsyncClient() as client:
+            # Check LLM (Cortex)
             try:
-                r = await client.get(f"{self.llm_url}/v1/health", timeout=3.0)
+                r = await client.get(f"{self.llm_url}/health", timeout=3.0)
                 results['components']['llm'] = {'ok': r.status_code == 200, 'status_code': r.status_code}
                 if r.status_code != 200:
                     results['ok'] = False
             except Exception as e:
                 results['components']['llm'] = {'ok': False, 'error': str(e)}
                 results['ok'] = False
+
+            # Check Subcortex (Embedding)
+            try:
+                r_emb = await client.get(f"{self.embedding_url}/health", timeout=3.0)
+                results['components']['embedding'] = {'ok': r_emb.status_code == 200, 'status_code': r_emb.status_code}
+            except Exception as e:
+                results['components']['embedding'] = {'ok': False, 'error': str(e)}
+
         return results
 
     async def ask_discovery_questions(self, session_id: str, message: str) -> Dict[str, Any]:
@@ -60,13 +80,20 @@ class PolarisAgent:
         if not s:
             raise KeyError('session not found')
         s['turns'].append({'from': 'client', 'text': message, 'ts': time.time()})
-        # ensure slots dict exists
-        slots = s.get('slots', {})
-        # attempt extraction (best-effort)
+
+        # Persist turn
+        if save_conversation_turn:
+            try:
+                save_conversation_turn(session_id, s.get('client_id'), s['turns'], s.get('metadata'))
+            except Exception:
+                pass
+
+        # Attempt extraction
         try:
             await self._extract_slots_from_message(s, message)
         except Exception:
             pass
+
         slots = s.get('slots', {})
         required = ['pain', 'users', 'kpi', 'budget']
         missing = [k for k in required if k not in slots]
@@ -82,28 +109,20 @@ class PolarisAgent:
         return {'next_question': None, 'slots': slots, 'complete': True, 'actions': [{'type': 'suggest_portfolio', 'candidates': candidates}]}
 
     async def _extract_slots_from_message(self, session: Dict[str, Any], message: str) -> None:
-        """Best-effort extraction of discovery slots from a user message using the LLM.
-
-        This method constructs a prompt to send to the LLM, asking it to extract
-        'pain', 'users', 'kpi', and 'budget' from the user's message. The LLM
-        is instructed to return a JSON object.
-
-        The method attempts to parse the LLM's response as JSON. If successful,
-        it updates the session's 'slots' with the extracted values.
-
-        Args:
-            session: The session dictionary, which holds the state of the conversation.
-            message: The user's message from which to extract slots.
-        """
-        # small, robust extractor that uses the LLM via call_llm and parses JSON if possible
-        prompt = f'Extract pain, users, kpi, budget from the message as a JSON object. Message: "{message}"'
+        prompt = (
+            f"Você é um analisador de requisitos técnicos. Extraia as informações da mensagem a seguir no formato JSON estrito:\n"
+            f'{{"pain": "dor principal", "users": "usuarios alvo", "kpi": "metrica chave", "budget": "orcamento estimado"}}\n'
+            f'Mensagem: "{message}"'
+        )
         res = await self.call_llm(prompt, max_tokens=256, temperature=0.0)
         if not res.get('ok'):
             return
         text = res.get('text') or ''
-        # try parse JSON
+        if "```json" in text:
+            text = text.split("```json")[1].split("```")[0].strip()
+        elif "```" in text:
+            text = text.split("```")[1].split("```")[0].strip()
         try:
-            import json
             parsed = json.loads(text)
         except Exception:
             parsed = None
@@ -117,7 +136,24 @@ class PolarisAgent:
             session['slots'] = slots
 
     async def select_portfolio(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
-        # simple static fallback used by tests
+        if embedding_adapter and search_similar_chunks:
+            try:
+                emb = embedding_adapter.get_embedding([query])
+                if emb:
+                    similar = search_similar_chunks(emb[0], top_k=top_k)
+                    if similar:
+                        return [
+                            {
+                                'id': s['artifact_id'],
+                                'title': s['metadata'].get('title', f"Solução #{s['artifact_id']}"),
+                                'score': round(s['similarity'], 3),
+                                'rationale': s['text'][:120]
+                            }
+                            for s in similar
+                        ]
+            except Exception:
+                pass
+
         examples = [
             {'id': 1, 'title': 'E-commerce básico', 'score': 0.95, 'rationale': 'MVP de loja online com checkout'},
             {'id': 2, 'title': 'SaaS B2B (subscrição)', 'score': 0.85, 'rationale': 'Plataforma com usuários corporativos'},
@@ -131,6 +167,25 @@ class PolarisAgent:
         content += '## Requisitos principais\n'
         for i, f in enumerate(context.get('features', ['Funcionalidade A', 'Funcionalidade B']), start=1):
             content += f"\n{i}. {f}\n"
+
+        if save_artifact_with_chunks and embedding_adapter:
+            try:
+                chunks_text = [context.get('summary', title)] + [f"Feature: {feat}" for feat in context.get('features', [])]
+                embeddings = embedding_adapter.get_embedding(chunks_text)
+                chunks_data = [
+                    {'text': t, 'embedding': emb, 'metadata': {'choice_id': choice_id}}
+                    for t, emb in zip(chunks_text, embeddings)
+                ]
+                save_artifact_with_chunks(
+                    project_id=None,
+                    artifact_type='prototipo',
+                    content=content,
+                    chunks=chunks_data,
+                    metadata={'choice_id': choice_id, 'title': title}
+                )
+            except Exception:
+                pass
+
         return {'artifact': {'path': None, 'content': content}}
 
     async def generate_mock(self, contract_name: str, context: dict, count: int = 10) -> List[Dict[str, Any]]:
@@ -163,35 +218,40 @@ class PolarisAgent:
             return 'L'
         return 'XL'
 
-    async def call_llm(self, prompt: str, max_tokens: int = 256, temperature: float = 0.2, timeout: int = 10) -> Dict[str, Any]:
-        url = f"{self.llm_url}/v1/generate"
-        payload = {'prompt': prompt, 'max_tokens': max_tokens, 'temperature': temperature}
+    async def call_llm(self, prompt: str, max_tokens: int = 256, temperature: float = 0.2, timeout: int = 15) -> Dict[str, Any]:
+        """Calls the upstream LLM supporting OpenAI chat completions, native completion, or /v1/generate."""
+        endpoints = [
+            ('/v1/chat/completions', {'messages': [{'role': 'user', 'content': prompt}], 'max_tokens': max_tokens, 'temperature': temperature}),
+            ('/completion', {'prompt': prompt, 'n_predict': max_tokens, 'temperature': temperature}),
+            ('/v1/generate', {'prompt': prompt, 'max_tokens': max_tokens, 'temperature': temperature})
+        ]
+
         async with httpx.AsyncClient() as client:
-            try:
-                r = await client.post(url, json=payload, timeout=timeout)
-                r.raise_for_status()
-                body = r.json()
-                t = body.get('text')
-                if isinstance(t, str):
-                    text = t
-                elif isinstance(t, dict):
-                    parts = t.get('parts') or []
-                    if parts:
-                        part = parts[0]
-                        text = part if isinstance(part, str) else part.get('text')
-                    else:
-                        text = str(t)
-                else:
-                    text = str(t)
-                return {'ok': True, 'text': text, 'meta': body}
-            except Exception as e:
-                return {'ok': False, 'error': str(e)}
+            last_err = None
+            for path, payload in endpoints:
+                url = f"{self.llm_url.rstrip('/')}{path}"
+                try:
+                    r = await client.post(url, json=payload, timeout=timeout)
+                    if r.status_code == 200:
+                        body = r.json()
+                        text = ""
+                        if 'choices' in body and body['choices']:
+                            msg = body['choices'][0].get('message', {})
+                            text = msg.get('content', '')
+                        elif 'content' in body:
+                            text = body['content']
+                        elif 'text' in body:
+                            text = body['text']
+                        return {'ok': True, 'text': text, 'meta': body}
+                except Exception as e:
+                    last_err = e
+                    continue
+            return {'ok': False, 'error': str(last_err)}
 
     async def call_llm_stream(self, prompt: str, max_tokens: int = 256, temperature: float = 0.2, timeout: int = 30):
-        """Streaming version of call_llm that yields tokens as they are generated."""
-        url = f"{self.llm_url}/v1/generate"
+        url = f"{self.llm_url.rstrip('/')}/v1/chat/completions"
         payload = {
-            'prompt': prompt,
+            'messages': [{'role': 'user', 'content': prompt}],
             'max_tokens': max_tokens,
             'temperature': temperature,
             'stream': True
@@ -201,20 +261,20 @@ class PolarisAgent:
                 async with client.stream('POST', url, json=payload, timeout=timeout) as response:
                     response.raise_for_status()
                     async for line in response.aiter_lines():
-                        if line.strip():
-                            # Parse SSE format (data: {...})
-                            if line.startswith('data: '):
-                                data = line[6:]  # Remove 'data: '
-                                if data == '[DONE]':
-                                    break
-                                try:
-                                    chunk = httpx.json.loads(data)
-                                    # Extract text from chunk
-                                    text = chunk.get('text', '')
-                                    if text:
-                                        yield {'type': 'token', 'text': text}
-                                except:
-                                    continue
+                        if line.startswith('data: '):
+                            data = line[6:]
+                            if data == '[DONE]':
+                                break
+                            try:
+                                chunk = json.loads(data)
+                                choices = chunk.get('choices', [])
+                                if choices:
+                                    delta = choices[0].get('delta', {})
+                                    content = delta.get('content', '')
+                                    if content:
+                                        yield {'type': 'token', 'text': content}
+                            except Exception:
+                                continue
                     yield {'type': 'done'}
             except Exception as e:
                 yield {'type': 'error', 'error': str(e)}
