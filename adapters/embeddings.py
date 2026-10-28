@@ -3,36 +3,18 @@ import requests
 from typing import List, Dict, Any, Optional
 
 EMBEDDING_URL = os.getenv('EMBEDDING_URL', 'http://127.0.0.1:20002')
-EMBEDDING_EMBED_PATH = os.getenv('EMBEDDING_EMBED_PATH', '/v1/embeddings')
-
-
-def _url(path: str) -> str:
-    return EMBEDDING_URL.rstrip('/') + '/' + path.lstrip('/')
 
 
 def get_embedding(texts: List[str], model: Optional[str] = None) -> List[List[float]]:
-    """Pede embeddings para o Subcórtex Gemma 270M (640D) no host 127.0.0.1:20002.
-    
-    Suporta payload 'input' (formato OpenAI/llama.cpp) e 'inputs' (compatibilidade).
-    """
-    candidates = [EMBEDDING_EMBED_PATH, '/v1/embeddings', '/embeddings', '/v1/embed', '/embed']
-    payload = {'input': texts, 'inputs': texts}
+    """Pede embeddings para o Subcórtex Gemma 270M (640D) no host 127.0.0.1:20002."""
+    url = f"{EMBEDDING_URL.rstrip('/')}/v1/embeddings"
+    payload = {'input': texts}
     if model:
         payload['model'] = model
-    body = None
-    last_err = None
-    for p in candidates:
-        try:
-            url = _url(p)
-            r = requests.post(url, json=payload, timeout=10)
-            r.raise_for_status()
-            body = r.json()
-            break
-        except Exception as e:
-            last_err = e
-            continue
-    if body is None:
-        raise last_err or RuntimeError("Failed to obtain embeddings from upstream")
+
+    r = requests.post(url, json=payload, timeout=30)
+    r.raise_for_status()
+    body = r.json()
 
     if 'data' in body and isinstance(body['data'], list):
         out = []
