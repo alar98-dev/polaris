@@ -4,16 +4,26 @@
 
 O POLARIS é um agente de IA que auxilia no desenvolvimento de software, desde descoberta de requisitos até geração de protótipos e estimativas.
 
+### Implantação Nativa no Ecossistema Aeon / SWA (WSL2 Debian)
+
+O Polaris está configurado e em execução como um serviço gerenciado pelo systemd no WSL2:
+- **Porta HTTP:** `http://127.0.0.1:8080` (CORS e binding restritos a loopback)
+- **Serviço Systemd:** `sudo systemctl status polaris.service`
+- **Banco de Dados:** PostgreSQL 17 `swa_matrix` (Schema nativo `polaris` com `pgvector` HNSW 640D)
+- **Córtex LLM:** `http://127.0.0.1:20003/v1` (Gemma-3 1B IT)
+- **Subcórtex Embeddings:** `http://127.0.0.1:20002/v1/embeddings` (Gemma-3 270M, 640D, 4 slots)
+- **Ciclo OODA:** Acoplado ao `continuum_daemon.py` para síntese autônoma de software na fase ACT
+
 ### Como Usar a API
 
 Para instruções completas de uso da API FastAPI, consulte: **[API_USAGE.md](API_USAGE.md)**
 
-**Iniciar servidor:**
+**Iniciar servidor manualmente (desenvolvimento):**
 ```bash
-uvicorn polaris.app:app --host 0.0.0.0 --port 8000
+/services/model-with-adpter-logic-semantic/venv/bin/python -m uvicorn polaris.app:app --host 127.0.0.1 --port 8080
 ```
 
-**Documentação interativa:** http://localhost:8000/docs
+**Documentação interativa:** http://127.0.0.1:8080/docs
 
 ---
 
